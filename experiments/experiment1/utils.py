@@ -4,15 +4,35 @@ import math
 import torch
 import numpy as np
 from tqdm import tqdm
+import sqlite3
 import tiktoken
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 import multiprocessing as mp
 
-def process(example, tokenizer):
-    ids = tokenizer.encode(example['text'], max_length=1024, truncation=True)
-    ids.append(tokenizer.eos_token_id)  # Appending the End of Document token
-    return {'ids': ids, 'len': len(ids)}
+class SQLiteWriter:
+    def __init__(self, sqlite_file):
+        self.sqlite_file = sqlite_file
+
+    def write(self, tokenized_example, split):
+        conn = sqlite3.connect(self.sqlite_file)
+        c = conn.cursor()
+        c.execute("INSERT INTO tokenized (input_ids, attention_mask, split) VALUES (?,?,?)",
+                  (pickle.dumps(tokenized_example["input_ids"]), 
+                   pickle.dumps(tokenized_example["attention_mask"]),
+                   split))
+        conn.commit()
+        conn.close()
+
+
+def process_and_write(example, tokenizer, writer, split):
+    tokenized_example = tokenizer(example["text"], truncation=True, max_length=512)  
+    writer.write({"input_ids": tokenized_example["input_ids"], 
+                  "attention_mask": tokenized_example["attention_mask"]},
+                 split)
+
+def process_with_tokenizer(example):
+    return process_and_write(example, tokenizer, writer)
 
 
 def get_batch(split):
