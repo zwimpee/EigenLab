@@ -8,7 +8,7 @@ from tfx.proto import trainer_pb2
 _pipeline_name = 'experiment1'
 _pipeline_root = os.path.join('pipeline', _pipeline_name)
 _data_path = 'data/experiment1.sqlite'
-_log_path = 'data/docs/logs/' + _pipeline_name + '.log
+_log_path = './logs/' + _pipeline_name + '.log
 
 # Define the data ingestion component
 example_gen = CsvExampleGen(input_base=_data_path)

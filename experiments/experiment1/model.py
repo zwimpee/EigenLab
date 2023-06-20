@@ -8,11 +8,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from nanoGPT.model import GPTConfig, GPT, MLP
+from prereqs.nanoGPT.model import GPTConfig, GPT, MLP
 
 # set up logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+def new_rielu(x):
+    return 0.5 * x * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * torch.pow(x, 3.0))))
 
 @dataclass
 class RotationallyInvariantGPTConfig:
@@ -65,9 +68,9 @@ class RotationallyInvariantAttention(nn.Module):
         self.gate_q = nn.Linear(config.n_embd, config.n_embd)
         self.gate_k = nn.Linear(config.n_embd, config.n_embd)
 
-        if not self.flash:
-            self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
-                                        .view(1, 1, config.block_size, config.block_size))
+        # if not self.flash:
+        #     self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
+        #                                 .view(1, 1, config.block_size, config.block_size))
 
     def forward(self, x):
         B, T, C = x.size()
@@ -129,7 +132,7 @@ class RotationallyInvariantBlock(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.ln_1 = RotationInvariantLayerNorm(config.n_embd, bias=config.bias)
-        self.attn = RotationInvariantAttention(config)
+        self.attn = RotationallyInvariantAttention(config)
         self.ln_2 = RotationInvariantLayerNorm(config.n_embd, bias=config.bias)
         self.mlp = RotationallyInvariantMLP(config)
 
