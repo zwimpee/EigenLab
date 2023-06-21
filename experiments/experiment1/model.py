@@ -1,3 +1,4 @@
+#.\experiments\experiment1\model.py
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
@@ -19,16 +20,14 @@ def new_rielu(x):
 
 @dataclass
 class RotationallyInvariantGPTConfig:
-    block_size: int = 1024
+    block_size: int = 512
     vocab_size: int = 50304 # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    n_layer: int = 12
-    n_head: int = 12
+    n_layer: int = 6
+    n_head: int = 8
     n_embd: int = 768
     dropout: float = 0.0
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     rotational_invariance: bool = True # Set to True to enable the rotationally invariant gate layers
-
-    
 
 # Models
 class RotationInvariantLayerNorm(nn.Module):
@@ -48,35 +47,24 @@ class RotationInvariantLayerNorm(nn.Module):
         # normalize
         return F.layer_norm(input, self.weight.shape, self.weight, self.bias, 1e-5)
 
-
 class RotationallyInvariantAttention(nn.Module):
-    
     def __init__(self, config):
         super().__init__()
         assert config.n_embd % config.n_head == 0
-
         self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd, bias=config.bias)
         self.c_proj = nn.Linear(config.n_embd, config.n_embd, bias=config.bias)
-
         self.attn_dropout = nn.Dropout(config.dropout)
         self.resid_dropout = nn.Dropout(config.dropout)
-
         self.n_head = config.n_head
         self.n_embd = config.n_embd
         self.dropout = config.dropout
+        self.gate_q = nn.Linear(config.n_embd // config.n_head, config.n_embd // config.n_head)
+        self.gate_k = nn.Linear(config.n_embd // config.n_head, config.n_embd // config.n_head)
 
-        self.gate_q = nn.Linear(config.n_embd, config.n_embd)
-        self.gate_k = nn.Linear(config.n_embd, config.n_embd)
 
-        # if not self.flash:
-        #     self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
-        #                                 .view(1, 1, config.block_size, config.block_size))
-
-    def forward(self, x):
+    def forward(self, x, rotation_matrix=None):
         B, T, C = x.size()
-
         q, k, v = self.c_attn(x).chunk(3, dim=-1)
-
         q = q.view(B, T, self.n_head, C // self.n_head).permute(0, 2, 1, 3)
         k = k.view(B, T, self.n_head, C // self.n_head).permute(0, 2, 1, 3)
         v = v.view(B, T, self.n_head, C // self.n_head).permute(0, 2, 1, 3)
@@ -89,21 +77,33 @@ class RotationallyInvariantAttention(nn.Module):
         att_dotproduct = att_dotproduct / math.sqrt(self.n_embd)
 
         # Rotation invariant attention
-        att_rotation = -torch.sqrt(torch.sum((q.unsqueeze(-2) - k.unsqueeze(-3)) ** 2, dim=-1))
+        print("Shape of q:", q.shape)
+        print("Shape of k:", k.shape)
+        print("Shape of v:", v.shape)
+
+        q_norm = torch.sum(q ** 2, dim=-1, keepdim=True)
+        k_norm = torch.sum(k ** 2, dim=-1, keepdim=True)
+        qk_dot = torch.matmul(q, k.transpose(-2, -1))
+
+        distances = q_norm + k_norm.transpose(-2, -1) - 2 * qk_dot
+        att_rotation = -torch.sqrt(distances)
         att_rotation = att_rotation / math.sqrt(self.n_embd)
+
+        print("Shape of att_dotproduct:", att_dotproduct.shape)
+        print("Shape of att_rotation:", att_rotation.shape)
 
         # Apply gating to attention scores
         att_scores = gate_q * att_dotproduct + (1 - gate_q) * att_rotation
         att_scores = att_scores / gate_k
 
-        att_weights = F.softmax(att_scores, dim=-1)
+        if rotation_matrix is not None:
+            att_scores = att_scores + rotation_matrix
 
+        att_weights = F.softmax(att_scores, dim=-1)
         y = torch.matmul(att_weights, v)
         y = y.permute(0, 2, 1, 3).contiguous().view(B, T, C)
-
         y = self.resid_dropout(self.c_proj(y))
         return y
-
 
 class RotationallyInvariantMLP(nn.Module):
 

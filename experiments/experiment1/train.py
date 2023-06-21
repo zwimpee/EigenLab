@@ -3,14 +3,17 @@ import logging
 import pickle
 import sqlite3
 import torch
+import torchvision
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
+import transformers
 
 from model import RotationallyInvariantGPT, RotationallyInvariantGPTConfig
 from prereqs.nanoGPT.model import GPTConfig, GPT, MLP
 from datasets import load_from_disk
 from torch.utils.data import DataLoader
+
 
 from transformers import GPT2TokenizerFast
 
@@ -44,9 +47,10 @@ class DatabaseInterface(object):
 
 
 class PlainTextDataset(torch.utils.data.Dataset):
-    def __init__(self, plain_text_dataset, tokenizer):
+    def __init__(self, plain_text_dataset, tokenizer, device):
         self.plain_text_dataset = plain_text_dataset
         self.tokenizer = tokenizer
+        self.device = device
 
     def __len__(self):
         return len(self.plain_text_dataset)
@@ -57,9 +61,9 @@ class PlainTextDataset(torch.utils.data.Dataset):
         input_ids = tokens["input_ids"]
         attention_mask = tokens["attention_mask"]
         return {
-        'input_ids': torch.as_tensor(input_ids[:-1], dtype=torch.long),
-        'attention_mask': torch.as_tensor(attention_mask[:-1], dtype=torch.long),
-        'labels': torch.as_tensor(input_ids[1:], dtype=torch.long)
+        'input_ids': torch.as_tensor(input_ids[:-1], dtype=torch.long).to(self.device),
+        'attention_mask': torch.as_tensor(attention_mask[:-1], dtype=torch.long).to(self.device),
+        'labels': torch.as_tensor(input_ids[1:], dtype=torch.long).to(self.device)
         }
 
 def train(model: nn.Module, optimizer: optim.Optimizer, train_loader: DataLoader) -> float:
@@ -109,31 +113,42 @@ if __name__ == '__main__':
         datefmt='%m/%d/%Y %H:%M:%S',
         level=logging.INFO
     )
+    logging.info(f"PyTorch version: {torch.__version__}")
+    logging.info(f"Torchvision version: {torchvision.__version__}")
+    logging.info(f"Transformers version: {transformers.__version__}")
+    logging.info(f"CUDA version: {torch.version.cuda}")
+    logging.info(f"cuDNN version: {torch.backends.cudnn.version()}")
+    
+    logging.info("Clearing cuda cache...")
+    torch.cuda.empty_cache()
+    
+    logging.info("Setting num_threads to 1...")
+    torch.set_num_threads(1)
     
     # Configs
     d_model = 512
-    num_heads = 8
-    num_layers = 6
+    num_heads = 4
+    num_layers = 1
     block_size = 512
     dropout = 0.2
     bias = True
+    rotational = True
     batch_size = 32
-    eval_batch_size = 256
+    eval_batch_size = 64
     epochs = 10
     lr = 0.001
     
-    vocab_size = 50257  # GPT-2 tokenizer vocab size
+    vocab_size = 50304  # GPT-2 tokenizer vocab size
     logging.info(f"Vocab size: {vocab_size}")
 
-    logging.info(
-        f'''
-        Config: 
-            d_model={d_model},
-            num_heads={num_heads}, 
-            num_layers={num_layers},
-            block_size={block_size}, 
-            dropout={dropout}, bias={bias}
-        '''
+    logging.info(f'''
+    Config: 
+        d_model={d_model},
+        num_heads={num_heads}, 
+        num_layers={num_layers},
+        block_size={block_size}, 
+        dropout={dropout}, bias={bias}
+    '''
     )
     logging.info(
         f"Training for {epochs} epochs with a learning rate of {lr}..."
@@ -144,6 +159,7 @@ if __name__ == '__main__':
     logging.info(f"Eval batch size: {eval_batch_size}")
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
     logging.info(f"Device: {device}")
     
     logging.info("Loading tokenizer")
@@ -162,8 +178,8 @@ if __name__ == '__main__':
     #logging.debug(f"Plain text val: {plain_text_val[:10]}")
 
     # Create train/val dataset objects
-    train_dataset = PlainTextDataset(plain_text_train, tokenizer)
-    valid_dataset = PlainTextDataset(plain_text_val, tokenizer)
+    train_dataset = PlainTextDataset(plain_text_train, tokenizer, device)
+    valid_dataset = PlainTextDataset(plain_text_val, tokenizer, device)
 
     
     # DEBUG
@@ -183,22 +199,56 @@ if __name__ == '__main__':
     logging.info(f"Number of train batches: {num_train_batches}")
     logging.info(f"Number of eval batches: {num_eval_batches}")
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False, collate_fn=pad_collate)
-    valid_loader = DataLoader(valid_dataset, batch_size=eval_batch_size,shuffle=False, collate_fn=pad_collate)
-    gpt_config = GPTConfig(vocab_size=vocab_size, n_embd=d_model, n_head=num_heads, n_layer=num_layers, block_size=block_size, dropout=dropout, bias=bias)
-    rigpt_config = RotationallyInvariantGPTConfig(vocab_size=vocab_size, n_embd=d_model, n_head=num_heads, n_layer=num_layers, block_size=block_size, dropout=dropout, bias=bias)
-    gpt = GPT(gpt_config).to(device)
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=batch_size, 
+        shuffle=False,
+        collate_fn=pad_collate
+    )
+    
+    valid_loader = DataLoader(
+        valid_dataset,
+        batch_size=eval_batch_size,
+        shuffle=False,
+        collate_fn=pad_collate
+    )
+    
+    # gpt_config = GPTConfig(
+    #     vocab_size=vocab_size,
+    #     n_embd=d_model, 
+    #     n_head=num_heads, 
+    #     n_layer=num_layers, 
+    #     block_size=block_size, 
+    #     dropout=dropout, 
+    #     bias=bias
+    #)
+    
+    rigpt_config = RotationallyInvariantGPTConfig(
+        vocab_size=vocab_size, 
+        n_embd=d_model, 
+        n_head=num_heads,
+        n_layer=num_layers, 
+        block_size=block_size, 
+        dropout=dropout, 
+        bias=bias,
+        rotational_invariance=rotational
+    )
+    
+    logging.info("Creating models...")
+    #gpt = GPT(gpt_config).to(device)
     rigpt = RotationallyInvariantGPT(rigpt_config).to(device)
-
-    optimizer_gpt = optim.Adam(gpt.parameters(), lr=lr)
+    
+    logging.info("Creating optimizers...")
+    #optimizer_gpt = optim.Adam(gpt.parameters(), lr=lr)
     optimizer_rigpt = optim.Adam(rigpt.parameters(), lr=lr)
-
+    
+    logging.info("Training...")
     for model, optimizer, model_name in [
-        (
-            gpt, 
-            optimizer_gpt, 
-            'GPT'
-        ), 
+        #(
+        #    gpt, 
+        #    optimizer_gpt, 
+        #    'GPT'
+        #), 
         (
             rigpt, 
             optimizer_rigpt, 

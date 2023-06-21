@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../zwimpee.github.io"
 		}
 	],
 	"settings": {}
