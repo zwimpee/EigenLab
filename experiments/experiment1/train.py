@@ -72,8 +72,7 @@ def train(model: nn.Module, optimizer: optim.Optimizer, train_loader: DataLoader
     for i, batch in enumerate(train_loader):
         inputs, targets = batch['input_ids'].to(device), batch['labels'].to(device)
         optimizer.zero_grad()
-        outputs = model(inputs, targets)
-        loss = outputs.loss
+        outputs, loss = model(inputs, targets)
         loss.backward()
         optimizer.step()
         running_loss += loss.item()
@@ -94,18 +93,6 @@ def evaluate(model, valid_loader) -> float:
             if i % 100 == 0:
                 logging.info(f"Batch {i}: Validation Loss={loss.item()}")
     return running_loss / len(valid_loader)
-
-
-def get_batch(split):
-    data = train_data if split == 'train' else val_data
-    ix = torch.randint(len(data) - block_size, (batch_size,))
-    x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
-    y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
-    if device.type == 'cuda':
-        x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
-    else:
-        x, y = x.to(device), y.to(device)
-    return x, y
 
 if __name__ == '__main__':
     logging.basicConfig(

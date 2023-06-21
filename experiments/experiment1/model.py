@@ -58,50 +58,58 @@ class RotationallyInvariantAttention(nn.Module):
         self.n_head = config.n_head
         self.n_embd = config.n_embd
         self.dropout = config.dropout
-        self.gate_q = nn.Linear(config.n_embd // config.n_head, config.n_embd // config.n_head)
-        self.gate_k = nn.Linear(config.n_embd // config.n_head, config.n_embd // config.n_head)
-
+        self.gate_q = nn.Linear(config.n_embd // config.n_head, 1, bias=config.bias)
+        self.gate_k = nn.Linear(config.n_embd // config.n_head, 1, bias=config.bias)
 
     def forward(self, x, rotation_matrix=None):
+        logging.debug(f'x.size(): {x.size()}')
+        
         B, T, C = x.size()
+        
+        logging.debug(f'B: {B}, T: {T}, C: {C}')
+        
         q, k, v = self.c_attn(x).chunk(3, dim=-1)
+        
+        logging.debug('Pre-Reshape Q, K, and V')
+        logging.debug(f'q.size(): {q.size()}, k.size(): {k.size()}, v.size(): {v.size()}')
+        logging.debug(f'q.shape: {q.shape}, k.shape: {k.shape}, v.shape: {v.shape}')
+        
+
+        # Reshape q and k to match the shape of att_dotproduct and att_rotation
         q = q.view(B, T, self.n_head, C // self.n_head).permute(0, 2, 1, 3)
         k = k.view(B, T, self.n_head, C // self.n_head).permute(0, 2, 1, 3)
         v = v.view(B, T, self.n_head, C // self.n_head).permute(0, 2, 1, 3)
+        
+        logging.debug('Post-Reshape Q, K, and V')
+        logging.debug(f'q.size(): {q.size()}, k.size(): {k.size()}, v.size(): {v.size()}')
+        logging.debug(f'q.shape: {q.shape}, k.shape: {k.shape}, v.shape: {v.shape}')
 
-        gate_q = torch.sigmoid(self.gate_q(q))
-        gate_k = torch.sigmoid(self.gate_k(k))
-
+        # Compute gate_q and gate_k such that they have the same shape as q and k
+        gate_q = torch.sigmoid(self.gate_q(q.view(B, self.n_head, T, -1)))
+        gate_k = torch.sigmoid(self.gate_k(k.view(B, self.n_head, T, -1)))
+        
         # Traditional dot-product attention
-        att_dotproduct = torch.matmul(q, k.transpose(-2, -1))
-        att_dotproduct = att_dotproduct / math.sqrt(self.n_embd)
-
+        qk_dot = q @ k.transpose(-2, -1)
+        att_dotproduct = qk_dot / math.sqrt(self.n_embd)
+        
         # Rotation invariant attention
-        print("Shape of q:", q.shape)
-        print("Shape of k:", k.shape)
-        print("Shape of v:", v.shape)
-
-        q_norm = torch.sum(q ** 2, dim=-1, keepdim=True)
-        k_norm = torch.sum(k ** 2, dim=-1, keepdim=True)
-        qk_dot = torch.matmul(q, k.transpose(-2, -1))
-
+        q_norm = torch.sum(q * q, dim=-1, keepdim=True)
+        k_norm = torch.sum(k * k, dim=-1, keepdim=True)
         distances = q_norm + k_norm.transpose(-2, -1) - 2 * qk_dot
         att_rotation = -torch.sqrt(distances)
         att_rotation = att_rotation / math.sqrt(self.n_embd)
 
-        print("Shape of att_dotproduct:", att_dotproduct.shape)
-        print("Shape of att_rotation:", att_rotation.shape)
-
         # Apply gating to attention scores
-        att_scores = gate_q * att_dotproduct + (1 - gate_q) * att_rotation
-        att_scores = att_scores / gate_k
+        mixed_att = att_dotproduct * gate_q + att_rotation * (torch.ones_like(gate_q) - gate_q)      
+        att_scores = mixed_att / gate_k
 
         if rotation_matrix is not None:
             att_scores = att_scores + rotation_matrix
 
         att_weights = F.softmax(att_scores, dim=-1)
-        y = torch.matmul(att_weights, v)
+        y = att_weights @ v
         y = y.permute(0, 2, 1, 3).contiguous().view(B, T, C)
+
         y = self.resid_dropout(self.c_proj(y))
         return y
 
@@ -356,3 +364,4 @@ class RotationallyInvariantGPT(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1)
 
         return idx
+    
