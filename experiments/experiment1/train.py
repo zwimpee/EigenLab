@@ -189,6 +189,9 @@ if __name__ == '__main__':
     logging.info(f"Number of train batches: {num_train_batches}")
     logging.info(f"Number of eval batches: {num_eval_batches}")
 
+    print(train_dataset[0])  # print the first example from the training set
+
+    
     train_loader = DataLoader(
         train_dataset, 
         batch_size=batch_size, 

@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from prereqs.nanoGPT.model import GPTConfig, GPT, MLP
+# from prereqs.nanoGPT.model import GPTConfig, GPT, MLP
 
 # set up logger
 logger = logging.getLogger(__name__)
