@@ -1,6 +1,7 @@
 #./experiments/experiment1/train.py
 import logging
 import pickle
+import click
 import sqlite3
 import torch
 import torchvision
@@ -10,8 +11,8 @@ import torch.nn.functional as F
 import transformers
 
 from model import RotationallyInvariantGPT, RotationallyInvariantGPTConfig
-from prereqs.nanoGPT.model import GPTConfig, GPT, MLP
-from datasets import load_from_disk
+# from prereqs.nanoGPT.model import GPTConfig, GPT, MLP
+from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 
@@ -137,10 +138,7 @@ if __name__ == '__main__':
         dropout={dropout}, bias={bias}
     '''
     )
-    logging.info(
-        f"Training for {epochs} epochs with a learning rate of {lr}..."
-    )
-    
+    logging.info(f"Training for {epochs} epochs with a learning rate of {lr}...")
     
     logging.info(f"Batch size: {batch_size}")
     logging.info(f"Eval batch size: {eval_batch_size}")
@@ -156,33 +154,35 @@ if __name__ == '__main__':
     # Query the database for the tokenized data
     logging.info("Querying plain text data...")
 
-    db_file_path = "data/experiment1.db"
+    # db_file_path = "./data/experiment1.db"
 
-    plain_text_train = DatabaseInterface(db_file_path).read("train")
-    #logging.debug(f"Plain text train: {plain_text_train[:10]}")
+    #plain_text_train = DatabaseInterface(db_file_path).read("train")
+    # logging.debug(f"Plain text train: {plain_text_train[:10]}")
 
-    plain_text_val = DatabaseInterface(db_file_path).read("val")
-    #logging.debug(f"Plain text val: {plain_text_val[:10]}")
+    #plain_text_val = DatabaseInterface(db_file_path).read("val")
+    # logging.debug(f"Plain text val: {plain_text_val[:10]}")
 
     # Create train/val dataset objects
-    train_dataset = PlainTextDataset(plain_text_train, tokenizer, device)
-    valid_dataset = PlainTextDataset(plain_text_val, tokenizer, device)
-
+    # train_dataset = PlainTextDataset(plain_text_train, tokenizer, device)
+    # valid_dataset = PlainTextDataset(plain_text_val, tokenizer, device)
     
-    # DEBUG
-    #for idx, item in enumerate(train_dataset):
-    #    input_ids = item["input_ids"]
-    #    attention_mask = item["attention_mask"]
-    #    if input_ids.size(0) == 0:
-    #        print(f"Sample index with 0 length: {idx}")
-    #        print(f"Input_ids: {input_ids}")
-    #        print(f"Attention_mask: {attention_mask}")
+    dataset = load_dataset(
+        "openwebtext", 
+        cache_dir=cache_dir, 
+        num_proc=num_processes,
+        save_infos = True,
+        writer_batch_size=batch_size
+        
+    )
+    
+    split_dataset = dataset["train"].train_test_split(test_size=0.1, seed=42, shuffle=False)
+    train_dataset = split_dataset["train"]
+    val_dataset = split_dataset["test"]
 
     # Calculate the number of batches
     num_train_batches = len(train_dataset) // batch_size
     num_eval_batches = len(valid_dataset) // eval_batch_size
 
-    
     logging.info(f"Number of train batches: {num_train_batches}")
     logging.info(f"Number of eval batches: {num_eval_batches}")
 
@@ -200,16 +200,6 @@ if __name__ == '__main__':
         collate_fn=pad_collate
     )
     
-    # gpt_config = GPTConfig(
-    #     vocab_size=vocab_size,
-    #     n_embd=d_model, 
-    #     n_head=num_heads, 
-    #     n_layer=num_layers, 
-    #     block_size=block_size, 
-    #     dropout=dropout, 
-    #     bias=bias
-    #)
-    
     rigpt_config = RotationallyInvariantGPTConfig(
         vocab_size=vocab_size, 
         n_embd=d_model, 
@@ -222,26 +212,13 @@ if __name__ == '__main__':
     )
     
     logging.info("Creating models...")
-    #gpt = GPT(gpt_config).to(device)
     rigpt = RotationallyInvariantGPT(rigpt_config).to(device)
     
     logging.info("Creating optimizers...")
-    #optimizer_gpt = optim.Adam(gpt.parameters(), lr=lr)
     optimizer_rigpt = optim.Adam(rigpt.parameters(), lr=lr)
     
     logging.info("Training...")
-    for model, optimizer, model_name in [
-        #(
-        #    gpt, 
-        #    optimizer_gpt, 
-        #    'GPT'
-        #), 
-        (
-            rigpt, 
-            optimizer_rigpt, 
-            'RotationallyInvariantGPT'
-        )
-    ]:
+    for model, optimizer, model_name in [(rigpt, optimizer_rigpt, 'RotationallyInvariantGPT')]:
         print(f"Training {model_name}")
         for epoch in range(1, epochs + 1):
             print(f"Training epoch {epoch}")
@@ -257,5 +234,5 @@ if __name__ == '__main__':
                 '''
             )
 
-    torch.save(gpt.state_dict(), "gpt.pt")
+    # torch.save(gpt.state_dict(), "gpt.pt")
     torch.save(rigpt.state_dict(), "rigpt.pt")

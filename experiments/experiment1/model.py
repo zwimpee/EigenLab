@@ -149,8 +149,6 @@ class RotationallyInvariantBlock(nn.Module):
         x = x + self.mlp(self.ln_2(x), rotation_matrix)
         return x
 
-
-
 class RotationallyInvariantGPT(nn.Module):
 
     def __init__(self, config):
