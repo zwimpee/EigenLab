@@ -168,7 +168,6 @@ if __name__ == '__main__':
     
     dataset = load_dataset(
         "openwebtext", 
-        cache_dir=cache_dir, 
         num_proc=num_processes,
         save_infos = True,
         writer_batch_size=batch_size
