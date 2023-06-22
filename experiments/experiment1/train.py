@@ -183,7 +183,7 @@ if __name__ == '__main__':
 
     # Calculate the number of batches
     num_train_batches = len(train_dataset) // batch_size
-    num_eval_batches = len(valid_dataset) // eval_batch_size
+    num_eval_batches = len(val_dataset) // eval_batch_size
 
     logging.info(f"Number of train batches: {num_train_batches}")
     logging.info(f"Number of eval batches: {num_eval_batches}")
@@ -196,7 +196,7 @@ if __name__ == '__main__':
     )
     
     valid_loader = DataLoader(
-        valid_dataset,
+        val_dataset,
         batch_size=eval_batch_size,
         shuffle=False,
         collate_fn=pad_collate
