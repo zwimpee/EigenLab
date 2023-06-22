@@ -169,7 +169,8 @@ if __name__ == '__main__':
     # valid_dataset = PlainTextDataset(plain_text_val, tokenizer, device)
     
     dataset = load_dataset(
-        "openwebtext", 
+        # "openwebtext", 
+        'wikitext-103-raw-v1',
         num_proc=num_processes,
         save_infos = True,
         writer_batch_size=batch_size
@@ -178,7 +179,7 @@ if __name__ == '__main__':
     
     split_dataset = dataset["train"].train_test_split(test_size=0.1, seed=42, shuffle=False)
     train_dataset = split_dataset["train"]
-    val_dataset = split_dataset["test"]
+    val_dataset = split_dataset["validation"]
 
     # Calculate the number of batches
     num_train_batches = len(train_dataset) // batch_size
