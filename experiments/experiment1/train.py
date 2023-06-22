@@ -110,8 +110,10 @@ if __name__ == '__main__':
     logging.info("Clearing cuda cache...")
     torch.cuda.empty_cache()
     
-    logging.info("Setting num_threads to 1...")
-    torch.set_num_threads(1)
+    num_processes = torch.cuda.device_count()
+    
+    # logging.info("Setting num_threads to 1...")
+    # torch.set_num_threads(1)
     
     # Configs
     d_model = 512
