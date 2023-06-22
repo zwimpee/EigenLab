@@ -179,7 +179,7 @@ if __name__ == '__main__':
     
     split_dataset = dataset["train"].train_test_split(test_size=0.1, seed=42, shuffle=False)
     train_dataset = split_dataset["train"]
-    val_dataset = split_dataset["validation"]
+    val_dataset = split_dataset["test"]
 
     # Calculate the number of batches
     num_train_batches = len(train_dataset) // batch_size
