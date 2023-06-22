@@ -174,9 +174,8 @@ if __name__ == '__main__':
         'wikitext-103-v1',
         num_proc=num_processes,
         save_infos = True,
-        writer_batch_size=batch_size
-        
-    )
+        writer_batch_size=batch_size 
+    ).with_format("torch")
     
     split_dataset = dataset["train"].train_test_split(test_size=0.1, seed=42, shuffle=False)
     train_dataset = split_dataset["train"]
@@ -189,18 +188,15 @@ if __name__ == '__main__':
     logging.info(f"Number of train batches: {num_train_batches}")
     logging.info(f"Number of eval batches: {num_eval_batches}")
 
-    print(train_dataset[0])  # print the first example from the training set
-
-    
     train_loader = DataLoader(
-        train_dataset, 
+        PlainTextDataset(train_dataset), 
         batch_size=batch_size, 
         shuffle=False,
         collate_fn=pad_collate
     )
     
     valid_loader = DataLoader(
-        val_dataset,
+        PlainTextDataset(val_dataset),
         batch_size=eval_batch_size,
         shuffle=False,
         collate_fn=pad_collate
