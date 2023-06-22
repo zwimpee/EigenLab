@@ -23,7 +23,7 @@ from torch.nn.utils.rnn import pad_sequence
 def pad_collate(batch):
     # Separating inputs and labels
     #print(d.keys() for d in batch) 
-    inputs = [d['text'] for d in batch]
+    inputs = [d['input_ids'] for d in batch]
     labels = [d['labels'] for d in batch]
 
     # Padding the input sequences
