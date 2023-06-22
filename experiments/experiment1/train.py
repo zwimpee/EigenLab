@@ -189,14 +189,14 @@ if __name__ == '__main__':
     logging.info(f"Number of eval batches: {num_eval_batches}")
 
     train_loader = DataLoader(
-        PlainTextDataset(train_dataset), 
+        PlainTextDataset(train_dataset, tokenizer, device), 
         batch_size=batch_size, 
         shuffle=False,
         collate_fn=pad_collate
     )
     
     valid_loader = DataLoader(
-        PlainTextDataset(val_dataset),
+        PlainTextDataset(val_dataset, tokenizer, device),
         batch_size=eval_batch_size,
         shuffle=False,
         collate_fn=pad_collate
