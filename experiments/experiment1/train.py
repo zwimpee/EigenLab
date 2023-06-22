@@ -172,7 +172,7 @@ if __name__ == '__main__':
     
     dataset = load_dataset(
         dataset,
-        split='wikitext-103-raw-v1',
+        config='wikitext-103-raw-v1',
         num_proc=num_processes,
         save_infos = True,
         writer_batch_size=batch_size
