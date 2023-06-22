@@ -168,10 +168,11 @@ if __name__ == '__main__':
     # train_dataset = PlainTextDataset(plain_text_train, tokenizer, device)
     # valid_dataset = PlainTextDataset(plain_text_val, tokenizer, device)
     
-    dataset = 'wikitext-103-raw-v1'
+    dataset = 'wikitext'
     
     dataset = load_dataset(
         dataset,
+        split='wikitext-103-raw-v1',
         num_proc=num_processes,
         save_infos = True,
         writer_batch_size=batch_size
