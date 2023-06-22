@@ -1,4 +1,3 @@
-pytorch  # nightly
-transformers  # for models
-datasets  # for data loading
-tfx  # for experiment tracking
+pytorch 
+transformers 
+datasets  

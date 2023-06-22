@@ -34,20 +34,6 @@ def pad_collate(batch):
 
     return {'input_ids': input_tensor, 'labels': label_tensor}
 
-class DatabaseInterface(object):
-    def __init__(self, db_file):
-        self.db_file = db_file
-
-    def read(self, split):
-        conn = sqlite3.connect(self.db_file)
-        c = conn.cursor()
-        c.execute(f"SELECT * FROM plain_text WHERE split='{split}'")
-        col_names = [desc[0] for desc in c.description]  # get column names
-        results = [dict(zip(col_names, row)) for row in c.fetchall()]  # convert tuples to dictionaries
-        conn.close()
-        return results
-
-
 class PlainTextDataset(torch.utils.data.Dataset):
     def __init__(self, plain_text_dataset, tokenizer, device):
         self.plain_text_dataset = plain_text_dataset
@@ -154,21 +140,6 @@ if __name__ == '__main__':
     tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
-    # Query the database for the tokenized data
-    logging.info("Querying plain text data...")
-
-    # db_file_path = "./data/experiment1.db"
-
-    #plain_text_train = DatabaseInterface(db_file_path).read("train")
-    # logging.debug(f"Plain text train: {plain_text_train[:10]}")
-
-    #plain_text_val = DatabaseInterface(db_file_path).read("val")
-    # logging.debug(f"Plain text val: {plain_text_val[:10]}")
-
-    # Create train/val dataset objects
-    # train_dataset = PlainTextDataset(plain_text_train, tokenizer, device)
-    # valid_dataset = PlainTextDataset(plain_text_val, tokenizer, device)
-    
     dataset = load_dataset(
         'wikitext',
         'wikitext-103-v1',
