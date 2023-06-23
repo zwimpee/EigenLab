@@ -1,7 +1,8 @@
 #./experiments/experiment1/train.py
 import logging
 import pickle
-import click
+#import click
+import multiprocessing
 import sqlite3
 import torch
 import torchvision
@@ -97,7 +98,7 @@ if __name__ == '__main__':
     logging.info("Clearing cuda cache...")
     torch.cuda.empty_cache()
     
-    num_processes = torch.cuda.device_count()
+    num_processes = torch.cuda.device_count() or multiprocessing.cpu_count()
     
     # logging.info("Setting num_threads to 1...")
     # torch.set_num_threads(1)
