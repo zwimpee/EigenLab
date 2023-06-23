@@ -14,7 +14,7 @@ import torch.nn.functional as F
 # set up logger
 logger = logging.getLogger(__name__)
 #logger.setLevel(logging.DEBUG)
-logger.setlevel(logging.INFO)
+logger.setLevel(logging.INFO)
 
 def new_rielu(x):
     return 0.5 * x * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * torch.pow(x, 3.0))))
