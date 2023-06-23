@@ -1,7 +1,7 @@
 #.\experiments\experiment1\model.py
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 import math
 from dataclasses import dataclass
